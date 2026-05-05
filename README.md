@@ -201,3 +201,57 @@ Ao finalizar: `mesa.disponivel` muda automaticamente para `true`.
 
 As mesas são criadas automaticamente ao iniciar o sistema.  
 **Não existe endpoint de CRUD para mesas.**
+
+---
+
+## Testando a API
+
+### Opção 1: Postman
+1. Importe o arquivo `FilaFacil.postman_collection.json`
+2. Configure a variável `baseUrl` como `http://localhost:3000`
+3. Execute os requests em ordem
+
+### Opção 2: cURL
+```bash
+# Criar entrada na fila
+curl -X POST http://localhost:3000/fila \
+  -H "Content-Type: application/json" \
+  -d '{"nome":"Maria","quantidade_pessoas":2}'
+
+# Listar fila
+curl http://localhost:3000/fila
+
+# Buscar entrada por ID
+curl http://localhost:3000/fila/1
+
+# Atualizar status
+curl -X PUT http://localhost:3000/fila/1/status \
+  -H "Content-Type: application/json" \
+  -d '{"status":"CHAMADO","mesa_id":1}'
+```
+
+---
+
+## Sprint 1 - Verificação de Requisitos
+
+✅ Backend REST funcional com 4 endpoints  
+✅ Banco de dados MySQL com schema bem estruturado  
+✅ Clean Architecture (controllers, services, repositories)  
+✅ Validações e tratamento de erros  
+✅ Coleção de testes Postman (FilaFacil.postman_collection.json)  
+✅ Proposta do projeto (PROPOSTA_PROJETO.txt)  
+✅ Código commitado no Git com histórico representativo
+
+---
+
+## Próximas etapas
+
+- **Sprint 2:** Integração com MOM (RabbitMQ/Redis)
+- **Sprint 3:** App Flutter para Cliente
+- **Sprint 4:** App Flutter para Prestador + Integração Completa
+
+---
+
+## Autores
+
+Desenvolvido como projeto integrador da disciplina de Desenvolvimento de Aplicações Móveis e Distribuídas (LDAMD) - PUC Minas, Engenharia de Software, 1º Semestre 2026.
