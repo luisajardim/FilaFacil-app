@@ -1,0 +1,247 @@
+{
+  "info": {
+    "_postman_id": "c6c73b1d-6b4f-4a6f-a3f4-7d5b2f1c2d10",
+    "name": "FilaFacil API",
+    "description": "Coleção da API FilaFacil com os 4 endpoints principais para gerenciar a fila de espera do restaurante.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "POST /fila - Criar entrada na fila",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"nome\": \"Maria Silva\",\n  \"quantidade_pessoas\": 4\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/fila",
+          "host": ["{{baseUrl}}"],
+          "path": ["fila"]
+        },
+        "description": "Cria uma nova entrada na fila. Se o cliente ainda nao existir, ele e criado automaticamente.\n\nCampos obrigatorios:\n- nome: string nao vazia\n- quantidade_pessoas: inteiro maior ou igual a 1"
+      },
+      "response": [
+        {
+          "name": "201 Created",
+          "originalRequest": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Maria Silva\",\n  \"quantidade_pessoas\": 4\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/fila",
+              "host": ["{{baseUrl}}"],
+              "path": ["fila"]
+            }
+          },
+          "status": "Created",
+          "code": 201,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "{\n  \"id\": 1,\n  \"cliente\": {\n    \"id\": 1,\n    \"nome\": \"Maria Silva\"\n  },\n  \"quantidade_pessoas\": 4,\n  \"status\": \"AGUARDANDO\",\n  \"mesa\": null,\n  \"criado_em\": \"2026-05-05T19:00:00.000Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "GET /fila - Listar fila",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/fila",
+          "host": ["{{baseUrl}}"],
+          "path": ["fila"]
+        },
+        "description": "Lista todas as entradas da fila em ordem de criacao. Retorna cliente, quantidade de pessoas, status, mesa e data de criacao."
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/fila",
+              "host": ["{{baseUrl}}"],
+              "path": ["fila"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "[\n  {\n    \"id\": 1,\n    \"cliente\": {\n      \"id\": 1,\n      \"nome\": \"Maria Silva\"\n    },\n    \"quantidade_pessoas\": 4,\n    \"status\": \"AGUARDANDO\",\n    \"mesa\": null,\n    \"criado_em\": \"2026-05-05T19:00:00.000Z\"\n  }\n]"
+        }
+      ]
+    },
+    {
+      "name": "GET /fila/:id - Buscar entrada por ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/fila/1",
+          "host": ["{{baseUrl}}"],
+          "path": ["fila", "1"]
+        },
+        "description": "Busca uma entrada especifica da fila pelo ID."
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/fila/1",
+              "host": ["{{baseUrl}}"],
+              "path": ["fila", "1"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "{\n  \"id\": 1,\n  \"cliente\": {\n    \"id\": 1,\n    \"nome\": \"Maria Silva\"\n  },\n  \"quantidade_pessoas\": 4,\n  \"status\": \"AGUARDANDO\",\n  \"mesa\": null,\n  \"criado_em\": \"2026-05-05T19:00:00.000Z\"\n}"
+        },
+        {
+          "name": "404 Not Found",
+          "originalRequest": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/fila/999",
+              "host": ["{{baseUrl}}"],
+              "path": ["fila", "999"]
+            }
+          },
+          "status": "Not Found",
+          "code": 404,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "{\n  \"erro\": \"Entrada com id 999 nao encontrada.\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "PUT /fila/:id/status - Atualizar status",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"CHAMADO\",\n  \"mesa_id\": 1\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/fila/1/status",
+          "host": ["{{baseUrl}}"],
+          "path": ["fila", "1", "status"]
+        },
+        "description": "Atualiza o status da entrada na fila. As transicoes validas sao:\n- AGUARDANDO -> CHAMADO (exige mesa_id)\n- CHAMADO -> ATENDIDO\n\nRegras aplicadas pela API:\n- status e obrigatorio\n- status deve ser um dos valores aceitos\n- mesa_id e obrigatorio quando status for CHAMADO"
+      },
+      "response": [
+        {
+          "name": "200 OK",
+          "originalRequest": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"CHAMADO\",\n  \"mesa_id\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/fila/1/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["fila", "1", "status"]
+            }
+          },
+          "status": "OK",
+          "code": 200,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "{\n  \"id\": 1,\n  \"cliente\": {\n    \"id\": 1,\n    \"nome\": \"Maria Silva\"\n  },\n  \"quantidade_pessoas\": 4,\n  \"status\": \"CHAMADO\",\n  \"mesa\": {\n    \"id\": 1,\n    \"capacidade\": 4,\n    \"disponivel\": false\n  },\n  \"criado_em\": \"2026-05-05T19:00:00.000Z\"\n}"
+        },
+        {
+          "name": "400/404/422 Error Examples",
+          "originalRequest": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"ATENDIDO\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/fila/1/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["fila", "1", "status"]
+            }
+          },
+          "status": "Unprocessable Entity",
+          "code": 422,
+          "header": [
+            {
+              "key": "Content-Type",
+              "value": "application/json; charset=utf-8"
+            }
+          ],
+          "body": "{\n  \"erro\": \"Transicao invalida: nao e possivel mudar de \\\"AGUARDANDO\\\" para \\\"ATENDIDO\\\". A proxima transicao valida e: \\\"CHAMADO\\\".\"\n}"
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000"
+    }
+  ]
+}

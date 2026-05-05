@@ -1,0 +1,134 @@
+FILAFÁCIL - PROPOSTA DE PROJETO
+Desenvolvimento de Sistema Distribuído com Aplicativo Móvel
+
+================================================================================
+
+DESCRIÇÃO DO DOMÍNIO
+
+FilaFácil é um sistema de gerenciamento de fila de espera para restaurantes. O sistema auxilia na organização de clientes aguardando mesas, permitindo que restaurantes gerenciem melhor o fluxo de atendimento, reduzam tempos de espera percebidos e melhorem a experiência do cliente durante períodos de pico.
+
+O domínio escolhido é relevante para estabelecimentos de alimentos e bebidas que enfrentam desafios na gestão de filas em horários de movimento intenso. O sistema permite rastreamento em tempo real do status da fila e notificação automática quando a mesa do cliente está disponível.
+
+================================================================================
+
+JUSTIFICATIVA
+
+A gestão de filas em restaurantes é um desafio operacional comum. Clientes frequentemente ficam frustrados por:
+• Falta de visibilidade sobre o tempo de espera real
+• Desconhecimento sobre o tamanho da fila
+• Dificuldade em rastrear quando sua mesa estará disponível
+
+FilaFácil resolve esses problemas ao:
+• Permitir que clientes se registrem na fila de forma digital
+• Fornecer estimativas claras sobre o atendimento
+• Notificar o cliente quando sua mesa estiver pronta
+• Facilitar a gestão de mesas e sua disponibilidade para o prestador
+
+Além disso, este projeto oferece excelente oportunidade de aprendizado em:
+• Arquitetura orientada a eventos
+• Comunicação distribuída assíncrona
+• Integração entre múltiplos componentes (backend, aplicativos móveis, middleware)
+
+================================================================================
+
+PERFIS DE USUÁRIO
+
+1. CLIENTE (Usuário Final)
+
+Quem é: Pessoa que chega ao restaurante e precisa aguardar uma mesa.
+
+Necessidades principais:
+• Registrar-se na fila informando nome e número de pessoas no grupo
+• Visualizar sua posição na fila
+• Receber notificação quando sua mesa estiver pronta
+• Consultar informações sobre tempo estimado de espera
+
+Fluxo de uso:
+- Chega ao restaurante
+- Abre o app e entra na fila (fornece nome e quantidade de pessoas)
+- Aguarda notificação de que sua mesa está pronta
+- Pode consultar o status da fila em tempo real
+
+
+2. PRESTADOR DE SERVIÇOS (Gerenciador de Atendimento)
+
+Quem é: Funcionário do restaurante responsável pela gestão das mesas e chamada de clientes.
+
+Necessidades principais:
+• Visualizar a fila de espera ordenada
+• Chamar clientes conforme mesas ficam disponíveis
+• Atribuir mesas aos clientes
+• Marcar quando o atendimento foi concluído
+• Receber notificações sobre novas entradas na fila
+
+Fluxo de uso:
+- Monitora a fila de clientes aguardando
+- Quando uma mesa é liberada, obtém a próxima entrada da fila
+- Chama o cliente e designa uma mesa apropriada ao tamanho do grupo
+- Marca como "atendido" quando o cliente deixa a mesa
+
+================================================================================
+
+PRINCIPAIS FUNCIONALIDADES
+
+BACKEND REST
+1. Criar entrada na fila (POST /fila)
+   - Registra novo cliente e cria entrada com status AGUARDANDO
+   - Retorna ID da entrada para rastreamento
+
+2. Listar fila completa (GET /fila)
+   - Retorna todas as entradas em ordem de chegada
+   - Mostra dados de cliente, tamanho do grupo e status
+
+3. Buscar entrada específica (GET /fila/:id)
+   - Permite consultar status de uma entrada individual
+   - Usado pelo cliente para rastrear sua posição
+
+4. Atualizar status (PUT /fila/:id/status)
+   - Transição de AGUARDANDO → CHAMADO (quando mesa é designada)
+   - Transição de CHAMADO → ATENDIDO (quando cliente é atendido)
+   - Verifica compatibilidade entre tamanho do grupo e capacidade da mesa
+
+BANCO DE DADOS
+- Tabela de clientes: armazena nomes e histórico
+- Tabela de mesas: registra capacidade e disponibilidade
+- Tabela de fila: rastreia entradas, status, cliente associado e mesa designada
+- Relacionamentos entre tabelas para integridade referencial
+
+VALIDAÇÕES E REGRAS DE NEGÓCIO
+- Cliente deve ter nome válido
+- Quantidade de pessoas deve ser >= 1
+- Transições de status seguem fluxo definido
+- Mesa designada deve ter capacidade suficiente para o grupo
+- Mesa deve estar disponível no momento da atribuição
+
+================================================================================
+
+TECNOLOGIAS UTILIZADAS (SPRINT 1)
+
+Backend: Node.js com Express.js
+Banco de dados: MySQL 8.0
+Testes de API: Postman
+Linguagem: JavaScript (Node.js)
+Padrão de arquitetura: Clean Architecture
+
+================================================================================
+
+ENTREGAS ESPERADAS
+
+Sprint 1:
+✓ Backend REST funcionando com 4 endpoints
+✓ Banco de dados criado e populado
+✓ Coleção de testes Postman com exemplos
+✓ Código organizado seguindo boas práticas
+✓ Esta proposta de projeto
+
+================================================================================
+
+PRÓXIMAS FASES
+
+Sprint 2: Integração com Middleware de Mensagens (RabbitMQ/Redis)
+Sprint 3: Desenvolvimento do App Flutter para Cliente
+Sprint 4: Desenvolvimento do App Flutter para Prestador + Integração Completa
+
+================================================================================
