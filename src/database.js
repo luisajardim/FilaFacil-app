@@ -1,66 +1,63 @@
-const mysql = require('mysql2/promise');
+const fs = require('fs');
+const path = require('path');
+const sqlite3 = require('sqlite3');
+const { open } = require('sqlite');
 
-let pool;
+let databasePromise;
 
-function getPool() {
-  if (!pool) {
-    pool = mysql.createPool({
-      host: process.env.DB_HOST || 'localhost',
-      port: process.env.DB_PORT || 3306,
-      user: process.env.DB_USER || 'root',
-      password: process.env.DB_PASSWORD || '',
-      database: process.env.DB_NAME || 'filafacil',
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0,
-    });
+function getDatabasePath() {
+  return path.resolve(process.cwd(), process.env.DB_PATH || path.join('data', 'filafacil.sqlite'));
+}
+
+async function getDatabase() {
+  if (!databasePromise) {
+    const dbPath = getDatabasePath();
+    fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+    databasePromise = open({ filename: dbPath, driver: sqlite3.Database });
   }
-  return pool;
+  const db = await databasePromise;
+  await db.exec('PRAGMA foreign_keys = ON');
+  return db;
 }
 
 async function initDatabase() {
-  const conn = await getPool().getConnection();
-  try {
-    // Criar tabelas
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS cliente (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        nome VARCHAR(255) NOT NULL,
-        criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
-      )
-    `);
+  const db = await getDatabase();
 
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS mesa (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        capacidade INT NOT NULL,
-        disponivel BOOLEAN NOT NULL DEFAULT TRUE
-      )
-    `);
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS cliente (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL UNIQUE,
+      criado_em TEXT NOT NULL DEFAULT (datetime('now'))
+    )
+  `);
 
-    await conn.execute(`
-      CREATE TABLE IF NOT EXISTS fila (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        cliente_id INT NOT NULL,
-        quantidade_pessoas INT NOT NULL,
-        status ENUM('AGUARDANDO', 'CHAMADO', 'ATENDIDO') NOT NULL DEFAULT 'AGUARDANDO',
-        mesa_id INT NULL,
-        criado_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY (cliente_id) REFERENCES cliente(id),
-        FOREIGN KEY (mesa_id) REFERENCES mesa(id)
-      )
-    `);
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS mesa (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      capacidade INTEGER NOT NULL,
+      disponivel INTEGER NOT NULL DEFAULT 1
+    )
+  `);
 
-    // Seed: garantir as 4 mesas
-    await seedMesas(conn);
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS fila (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      cliente_id INTEGER NOT NULL,
+      quantidade_pessoas INTEGER NOT NULL,
+      status TEXT NOT NULL DEFAULT 'AGUARDANDO',
+      mesa_id INTEGER NULL,
+      criado_em TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (cliente_id) REFERENCES cliente(id),
+      FOREIGN KEY (mesa_id) REFERENCES mesa(id),
+      CHECK (status IN ('AGUARDANDO', 'CHAMADO', 'ATENDIDO'))
+    )
+  `);
 
-    console.log('Banco de dados inicializado com sucesso.');
-  } finally {
-    conn.release();
-  }
+  await seedMesas(db);
+  console.log('Banco de dados inicializado com sucesso.');
 }
 
-async function seedMesas(conn) {
+async function seedMesas(db) {
   const mesas = [
     { id: 1, capacidade: 2 },
     { id: 2, capacidade: 4 },
@@ -69,16 +66,13 @@ async function seedMesas(conn) {
   ];
 
   for (const mesa of mesas) {
-    // Insere apenas se não existir
-    await conn.execute(
-      `INSERT INTO mesa (id, capacidade, disponivel)
-       VALUES (?, ?, TRUE)
-       ON DUPLICATE KEY UPDATE capacidade = VALUES(capacidade)`,
+    await db.run(
+      `INSERT INTO mesa (id, capacidade, disponivel) VALUES (?, ?, 1)
+       ON CONFLICT(id) DO UPDATE SET capacidade = excluded.capacidade`,
       [mesa.id, mesa.capacidade]
     );
   }
-
   console.log('Seed de mesas concluído.');
 }
 
-module.exports = { getPool, initDatabase };
+module.exports = { getDatabase, initDatabase };

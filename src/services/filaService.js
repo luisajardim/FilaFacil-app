@@ -1,7 +1,7 @@
 const clienteRepository = require('../repositories/clienteRepository');
 const mesaRepository = require('../repositories/mesaRepository');
 const filaRepository = require('../repositories/filaRepository');
-const { getPool } = require('../database');
+const { getDatabase } = require('../database');
 
 const TRANSICOES_VALIDAS = {
   AGUARDANDO: 'CHAMADO',
@@ -118,17 +118,15 @@ async function atualizarStatus(id, { status, mesa_id }) {
     }
 
     // Executa dentro de uma transação
-    const conn = await getPool().getConnection();
+    const db = await getDatabase();
     try {
-      await conn.beginTransaction();
-      await filaRepository.updateStatus(id, { status: 'CHAMADO', mesa_id }, conn);
-      await mesaRepository.setDisponivel(mesa_id, false, conn);
-      await conn.commit();
+      await db.exec('BEGIN TRANSACTION');
+      await filaRepository.updateStatus(id, { status: 'CHAMADO', mesa_id }, db);
+      await mesaRepository.setDisponivel(mesa_id, false, db);
+      await db.exec('COMMIT');
     } catch (e) {
-      await conn.rollback();
+      await db.exec('ROLLBACK');
       throw e;
-    } finally {
-      conn.release();
     }
   }
 
@@ -136,19 +134,17 @@ async function atualizarStatus(id, { status, mesa_id }) {
   if (status === 'ATENDIDO') {
     const mesa_id_atual = entrada.mesa ? entrada.mesa.id : null;
 
-    const conn = await getPool().getConnection();
+    const db = await getDatabase();
     try {
-      await conn.beginTransaction();
-      await filaRepository.updateStatus(id, { status: 'ATENDIDO' }, conn);
+      await db.exec('BEGIN TRANSACTION');
+      await filaRepository.updateStatus(id, { status: 'ATENDIDO' }, db);
       if (mesa_id_atual) {
-        await mesaRepository.setDisponivel(mesa_id_atual, true, conn);
+        await mesaRepository.setDisponivel(mesa_id_atual, true, db);
       }
-      await conn.commit();
+      await db.exec('COMMIT');
     } catch (e) {
-      await conn.rollback();
+      await db.exec('ROLLBACK');
       throw e;
-    } finally {
-      conn.release();
     }
   }
 

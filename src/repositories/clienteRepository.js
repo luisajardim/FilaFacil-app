@@ -1,25 +1,20 @@
-const { getPool } = require('../database');
+const { getDatabase } = require('../database');
 
-async function findByNome(nome) {
-  const [rows] = await getPool().execute(
-    'SELECT * FROM cliente WHERE nome = ? LIMIT 1',
-    [nome]
-  );
-  return rows[0] || null;
+async function findByNome(nome, db = null) {
+  const database = db || await getDatabase();
+  return database.get('SELECT * FROM cliente WHERE nome = ? LIMIT 1', [nome]);
 }
 
-async function create(nome) {
-  const [result] = await getPool().execute(
-    'INSERT INTO cliente (nome, criado_em) VALUES (?, NOW())',
-    [nome]
-  );
-  return { id: result.insertId, nome };
+async function create(nome, db = null) {
+  const database = db || await getDatabase();
+  const result = await database.run('INSERT INTO cliente (nome, criado_em) VALUES (?, datetime(\'now\'))', [nome]);
+  return { id: result.lastID, nome };
 }
 
-async function findOrCreate(nome) {
-  let cliente = await findByNome(nome);
+async function findOrCreate(nome, db = null) {
+  let cliente = await findByNome(nome, db);
   if (!cliente) {
-    cliente = await create(nome);
+    cliente = await create(nome, db);
   }
   return cliente;
 }

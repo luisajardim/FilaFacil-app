@@ -7,7 +7,7 @@ Sistema de gerenciamento de fila de espera para restaurante.
 ## Pré-requisitos
 
 - Node.js >= 18
-- MySQL >= 8
+- SQLite (arquivo local gerado automaticamente)
 
 ---
 
@@ -19,7 +19,7 @@ npm install
 
 # Criar o arquivo .env
 cp .env.example .env
-# Edite o .env com suas credenciais do MySQL
+Edite `DB_PATH` se quiser um local diferente para o arquivo SQLite
 ```
 
 ### Criar o banco de dados no MySQL
@@ -33,11 +33,7 @@ CREATE DATABASE filafacil CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ## Variáveis de ambiente (`.env`)
 
 ```
-DB_HOST=localhost
-DB_PORT=3306
-DB_USER=root
-DB_PASSWORD=sua_senha
-DB_NAME=filafacil
+DB_PATH=./data/filafacil.sqlite
 PORT=3000
 ```
 
@@ -56,6 +52,7 @@ npm run dev
 Ao iniciar, o sistema:
 1. Cria as tabelas automaticamente (se não existirem)
 2. Insere as 4 mesas pré-cadastradas (seed)
+3. Persiste tudo em um arquivo SQLite local (por padrão `./data/filafacil.sqlite`)
 
 ---
 

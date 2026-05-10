@@ -1,4 +1,4 @@
-const { getPool } = require('../database');
+const { getDatabase } = require('../database');
 
 const SELECT_FILA = `
   SELECT
@@ -37,43 +37,35 @@ function formatRow(row) {
   };
 }
 
-async function findAll() {
-  const [rows] = await getPool().execute(
-    `${SELECT_FILA} ORDER BY f.criado_em ASC`
-  );
+async function findAll(db = null) {
+  const database = db || await getDatabase();
+  const rows = await database.all(`${SELECT_FILA} ORDER BY f.criado_em ASC`);
   return rows.map(formatRow);
 }
 
-async function findById(id) {
-  const [rows] = await getPool().execute(
-    `${SELECT_FILA} WHERE f.id = ?`,
-    [id]
-  );
-  return formatRow(rows[0] || null);
+async function findById(id, db = null) {
+  const database = db || await getDatabase();
+  const row = await database.get(`${SELECT_FILA} WHERE f.id = ?`, [id]);
+  return formatRow(row || null);
 }
 
-async function create({ cliente_id, quantidade_pessoas }) {
-  const [result] = await getPool().execute(
+async function create({ cliente_id, quantidade_pessoas }, db = null) {
+  const database = db || await getDatabase();
+  const result = await database.run(
     `INSERT INTO fila (cliente_id, quantidade_pessoas, status, mesa_id, criado_em)
-     VALUES (?, ?, 'AGUARDANDO', NULL, NOW())`,
+     VALUES (?, ?, 'AGUARDANDO', NULL, datetime('now'))`,
     [cliente_id, quantidade_pessoas]
   );
-  return findById(result.insertId);
+  return findById(result.lastID, database);
 }
 
-async function updateStatus(id, { status, mesa_id }, conn = null) {
-  const db = conn || getPool();
+async function updateStatus(id, { status, mesa_id }, db = null) {
+  const database = db || await getDatabase();
 
   if (mesa_id !== undefined) {
-    await db.execute(
-      'UPDATE fila SET status = ?, mesa_id = ? WHERE id = ?',
-      [status, mesa_id, id]
-    );
+    await database.run('UPDATE fila SET status = ?, mesa_id = ? WHERE id = ?', [status, mesa_id, id]);
   } else {
-    await db.execute(
-      'UPDATE fila SET status = ? WHERE id = ?',
-      [status, id]
-    );
+    await database.run('UPDATE fila SET status = ? WHERE id = ?', [status, id]);
   }
 }
 
