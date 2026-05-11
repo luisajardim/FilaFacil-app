@@ -8,10 +8,8 @@ const app = express();
 
 app.use(express.json());
 
-// Rotas
 app.use('/fila', filaRoutes);
 
-// Rota raiz informativa
 app.get('/', (req, res) => {
   res.json({
     sistema: 'FilaFácil',
@@ -25,7 +23,6 @@ app.get('/', (req, res) => {
   });
 });
 
-// Tratamento de erros
 app.use(errorHandler);
 
 const PORT = process.env.PORT || 3000;

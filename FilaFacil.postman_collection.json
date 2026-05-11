@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "c6c73b1d-6b4f-4a6f-a3f4-7d5b2f1c2d10",
     "name": "FilaFacil API",
-    "description": "Coleção da API FilaFacil com os 4 endpoints principais para gerenciar a fila de espera do restaurante.",
+    "description": "Colecao da API FilaFacil para testar o fluxo principal da fila. Ela cobre a criacao da entrada, a listagem, a busca por ID e a troca de status, tudo usando SQLite por padrao.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -25,11 +25,11 @@
           "host": ["{{baseUrl}}"],
           "path": ["fila"]
         },
-        "description": "Cria uma nova entrada na fila. Se o cliente ainda nao existir, ele e criado automaticamente.\n\nCampos obrigatorios:\n- nome: string nao vazia\n- quantidade_pessoas: inteiro maior ou igual a 1"
+        "description": "Cria uma nova entrada na fila. Se o cliente ainda nao existe, a API registra ele na hora e segue com a entrada.\n\nO que precisa mandar:\n- nome: texto nao vazio\n- quantidade_pessoas: numero inteiro maior ou igual a 1"
       },
       "response": [
         {
-          "name": "201 Created",
+          "name": "201 - entrada criada",
           "originalRequest": {
             "method": "POST",
             "header": [
@@ -70,11 +70,11 @@
           "host": ["{{baseUrl}}"],
           "path": ["fila"]
         },
-        "description": "Lista todas as entradas da fila em ordem de criacao. Retorna cliente, quantidade de pessoas, status, mesa e data de criacao."
+        "description": "Mostra a fila do jeito como ela esta naquele momento, em ordem de criacao. A resposta traz o cliente, a quantidade de pessoas, o status, a mesa e a data de criacao."
       },
       "response": [
         {
-          "name": "200 OK",
+          "name": "200 - fila listada",
           "originalRequest": {
             "method": "GET",
             "header": [],
@@ -106,11 +106,11 @@
           "host": ["{{baseUrl}}"],
           "path": ["fila", "1"]
         },
-        "description": "Busca uma entrada especifica da fila pelo ID."
+        "description": "Busca uma entrada da fila pelo ID. E o jeito mais rapido de conferir se um registro especifico existe e como ele esta naquele momento."
       },
       "response": [
         {
-          "name": "200 OK",
+          "name": "200 - entrada encontrada",
           "originalRequest": {
             "method": "GET",
             "header": [],
@@ -131,7 +131,7 @@
           "body": "{\n  \"id\": 1,\n  \"cliente\": {\n    \"id\": 1,\n    \"nome\": \"Maria Silva\"\n  },\n  \"quantidade_pessoas\": 4,\n  \"status\": \"AGUARDANDO\",\n  \"mesa\": null,\n  \"criado_em\": \"2026-05-05T19:00:00.000Z\"\n}"
         },
         {
-          "name": "404 Not Found",
+          "name": "404 - entrada nao encontrada",
           "originalRequest": {
             "method": "GET",
             "header": [],
@@ -172,11 +172,11 @@
           "host": ["{{baseUrl}}"],
           "path": ["fila", "1", "status"]
         },
-        "description": "Atualiza o status da entrada na fila. As transicoes validas sao:\n- AGUARDANDO -> CHAMADO (exige mesa_id)\n- CHAMADO -> ATENDIDO\n\nRegras aplicadas pela API:\n- status e obrigatorio\n- status deve ser um dos valores aceitos\n- mesa_id e obrigatorio quando status for CHAMADO"
+        "description": "Atualiza o status da entrada na fila. Esse endpoint cuida do momento em que o cliente e chamado para a mesa e tambem do momento em que o atendimento termina.\n\nAs transicoes aceitas hoje sao:\n- AGUARDANDO -> CHAMADO, informando mesa_id\n- CHAMADO -> ATENDIDO\n\nRegras que a API valida antes de salvar:\n- status e obrigatorio\n- status precisa ser um valor aceito\n- mesa_id so e exigido quando o status for CHAMADO"
       },
       "response": [
         {
-          "name": "200 OK",
+          "name": "200 - status atualizado",
           "originalRequest": {
             "method": "PUT",
             "header": [
@@ -206,7 +206,7 @@
           "body": "{\n  \"id\": 1,\n  \"cliente\": {\n    \"id\": 1,\n    \"nome\": \"Maria Silva\"\n  },\n  \"quantidade_pessoas\": 4,\n  \"status\": \"CHAMADO\",\n  \"mesa\": {\n    \"id\": 1,\n    \"capacidade\": 4,\n    \"disponivel\": false\n  },\n  \"criado_em\": \"2026-05-05T19:00:00.000Z\"\n}"
         },
         {
-          "name": "400/404/422 Error Examples",
+          "name": "422 - transicao invalida",
           "originalRequest": {
             "method": "PUT",
             "header": [

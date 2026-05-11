@@ -1,90 +1,68 @@
-# FilaFácil — Backend REST
+# FilaFácil
 
-Sistema de gerenciamento de fila de espera para restaurante.
+O FilaFácil é uma API simples para controlar fila de espera de restaurante. A ideia é registrar quem está aguardando, chamar o cliente para uma mesa e depois marcar o atendimento como concluído, mantendo tudo salvo em SQLite.
 
----
+O projeto foi pensado para ser direto de usar e fácil de testar. Ao subir a aplicação, o banco é criado automaticamente, as mesas padrão são cadastradas e os endpoints já ficam prontos para consumo no Postman ou via cURL.
 
 ## Pré-requisitos
 
-- Node.js >= 18
-- SQLite (arquivo local gerado automaticamente)
+- Node.js 18+
+- npm instalado junto com o Node.js
+- SQLite local gerado automaticamente pelo próprio projeto
 
----
-
-## Instalação
+## Instalação e execução
 
 ```bash
-# Instalar dependências
 npm install
-
-# Criar o arquivo .env
 cp .env.example .env
-Edite `DB_PATH` se quiser um local diferente para o arquivo SQLite
+npm start
 ```
 
-### Criar o banco de dados no MySQL
-
-```sql
-CREATE DATABASE filafacil CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-```
-
----
-
-## Variáveis de ambiente (`.env`)
-
-```
-DB_PATH=./data/filafacil.sqlite
-PORT=3000
-```
-
----
-
-## Executar
+Se preferir, também dá para usar o modo de desenvolvimento com:
 
 ```bash
-# Produção
-npm start
-
-# Desenvolvimento (com hot-reload)
 npm run dev
 ```
 
-Ao iniciar, o sistema:
-1. Cria as tabelas automaticamente (se não existirem)
-2. Insere as 4 mesas pré-cadastradas (seed)
-3. Persiste tudo em um arquivo SQLite local (por padrão `./data/filafacil.sqlite`)
+O arquivo `.env` já vem com o caminho padrão do banco, mas você pode ajustar `DB_PATH` se quiser guardar o SQLite em outro lugar. Se a variável `PORT` não for definida, a aplicação sobe na porta `3000`.
 
----
+## O que a aplicação faz
 
-## Estrutura do Projeto
+O fluxo é simples:
 
-```
-src/
-├── app.js                          # Ponto de entrada / Express
-├── database.js                     # Conexão + inicialização do BD
-├── routes/
-│   └── filaRoutes.js               # Definição das rotas
-├── controllers/
-│   └── filaController.js           # Camada HTTP (req/res)
-├── services/
-│   └── filaService.js              # Regras de negócio
-├── repositories/
-│   ├── clienteRepository.js        # Acesso a dados: cliente
-│   ├── mesaRepository.js           # Acesso a dados: mesa
-│   └── filaRepository.js           # Acesso a dados: fila
-└── middlewares/
-    └── errorHandler.js             # Tratamento centralizado de erros
-```
+1. O cliente entra na fila com nome e quantidade de pessoas.
+2. A entrada começa com o status `AGUARDANDO`.
+3. Quando a mesa é definida, o status passa para `CHAMADO`.
+4. Depois do atendimento, o status muda para `ATENDIDO` e a mesa volta a ficar disponível.
 
----
+## Estrutura
+
+- `src/app.js`: sobe o Express, registra as rotas e expõe a rota raiz com informações básicas da API.
+- `src/database.js`: abre a conexão com o SQLite, cria as tabelas e faz o seed das mesas padrão.
+- `src/routes`: concentra os endpoints da fila.
+- `src/controllers`: faz a ponte entre as requisições HTTP e a camada de serviço.
+- `src/services`: concentra as regras de negócio e as validações principais.
+- `src/repositories`: acessa os dados sem misturar regra de negócio com SQL.
+- `src/middlewares`: centraliza o tratamento de erros.
+
+## Modelo de dados
+
+O banco trabalha com três entidades principais:
+
+- `cliente`: guarda o nome do cliente e evita duplicidade quando ele entra na fila mais de uma vez.
+- `mesa`: representa as mesas disponíveis, com capacidade e status de disponibilidade.
+- `fila`: guarda a entrada na fila, relacionando cliente, quantidade de pessoas, mesa e status.
+
+As mesas 1, 2, 3 e 4 são criadas automaticamente na inicialização, com capacidades 2, 4, 4 e 8.
 
 ## Endpoints
 
-### POST `/fila` — Entrar na fila
+### `POST /fila`
 
-Cria o cliente automaticamente se não existir.
+Cria uma nova entrada na fila.
 
-**Body:**
+Body esperado:
+
 ```json
 {
   "nome": "João",
@@ -92,52 +70,39 @@ Cria o cliente automaticamente se não existir.
 }
 ```
 
-**Resposta 201:**
+Resposta típica:
+
 ```json
 {
   "id": 1,
-  "cliente": { "id": 1, "nome": "João" },
+  "cliente": {
+    "id": 1,
+    "nome": "João"
+  },
   "quantidade_pessoas": 4,
   "status": "AGUARDANDO",
   "mesa": null,
-  "criado_em": "2024-01-15T10:00:00.000Z"
+  "criado_em": "2026-05-10T12:00:00.000Z"
 }
 ```
 
----
+### `GET /fila`
 
-### GET `/fila` — Listar fila
+Lista todas as entradas da fila em ordem de criação.
 
-Retorna todas as entradas ordenadas por `criado_em ASC`.
+### `GET /fila/:id`
 
-**Resposta 200:**
-```json
-[
-  {
-    "id": 1,
-    "cliente": { "id": 1, "nome": "João" },
-    "quantidade_pessoas": 4,
-    "status": "AGUARDANDO",
-    "mesa": null,
-    "criado_em": "2024-01-15T10:00:00.000Z"
-  }
-]
-```
+Busca uma entrada específica pelo ID.
 
----
+### `PUT /fila/:id/status`
 
-### GET `/fila/:id` — Buscar por ID
+Atualiza o status de uma entrada. O fluxo aceito hoje é:
 
-**Resposta 200:** mesmo formato acima  
-**Resposta 404:** `{ "erro": "Entrada com id 99 não encontrada." }`
+- `AGUARDANDO` para `CHAMADO`, informando `mesa_id`.
+- `CHAMADO` para `ATENDIDO`, sem necessidade de nova mesa.
 
----
+Exemplo de chamada:
 
-### PUT `/fila/:id/status` — Atualizar status
-
-#### Chamar cliente (AGUARDANDO → CHAMADO)
-
-**Body:**
 ```json
 {
   "status": "CHAMADO",
@@ -145,88 +110,39 @@ Retorna todas as entradas ordenadas por `criado_em ASC`.
 }
 ```
 
-Validações:
-- `mesa_id` é obrigatório
-- Mesa deve existir
-- Mesa deve estar disponível (`disponivel = true`)
-- `mesa.capacidade >= quantidade_pessoas`
+Ao chamar o cliente, a mesa fica indisponível. Quando o atendimento é concluído, a mesa é liberada automaticamente.
 
-Ao chamar: `mesa.disponivel` muda para `false`.
+## Regras e retornos
 
-#### Finalizar atendimento (CHAMADO → ATENDIDO)
+- O nome do cliente é obrigatório.
+- A quantidade de pessoas precisa ser maior que zero.
+- A mesa precisa existir e ter capacidade para o grupo.
+- A mesa precisa estar disponível para ser vinculada ao cliente.
+- A API responde com `400` para dados inválidos, `404` quando o recurso não existe e `422` quando alguma regra de negócio é violada.
 
-**Body:**
-```json
-{
-  "status": "ATENDIDO"
-}
-```
+## Como testar
 
-Ao finalizar: `mesa.disponivel` muda automaticamente para `true`.
+O jeito mais simples é importar `FilaFacil.postman_collection.json` no Postman e apontar a variável `baseUrl` para `http://localhost:3000`.
 
----
+Se preferir testar na mão, estes comandos resolvem o básico:
 
-## Códigos de erro
-
-| Código | Significado                         |
-|--------|-------------------------------------|
-| 400    | Dados inválidos / campos ausentes   |
-| 404    | Recurso não encontrado              |
-| 422    | Regra de negócio violada            |
-
----
-
-## Fluxo completo (exemplo Postman)
-
-```
-1. POST /fila           → { nome: "João", quantidade_pessoas: 4 }   → status: AGUARDANDO
-2. GET  /fila           → lista a fila
-3. PUT  /fila/1/status  → { status: "CHAMADO", mesa_id: 2 }         → mesa fica indisponível
-4. PUT  /fila/1/status  → { status: "ATENDIDO" }                    → mesa liberada automaticamente
-```
-
----
-
-## Mesas pré-cadastradas (seed automático)
-
-| ID | Capacidade | Disponível |
-|----|-----------|------------|
-| 1  | 2         | true       |
-| 2  | 4         | true       |
-| 3  | 4         | true       |
-| 4  | 8         | true       |
-
-As mesas são criadas automaticamente ao iniciar o sistema.  
-**Não existe endpoint de CRUD para mesas.**
-
----
-
-## Testando a API
-
-### Opção 1: Postman
-1. Importe o arquivo `FilaFacil.postman_collection.json`
-2. Configure a variável `baseUrl` como `http://localhost:3000`
-3. Execute os requests em ordem
-
-### Opção 2: cURL
 ```bash
-# Criar entrada na fila
-curl -X POST http://localhost:3000/fila \
-  -H "Content-Type: application/json" \
-  -d '{"nome":"Maria","quantidade_pessoas":2}'
-
-# Listar fila
+curl -X POST http://localhost:3000/fila -H "Content-Type: application/json" -d '{"nome":"Maria","quantidade_pessoas":2}'
 curl http://localhost:3000/fila
-
-# Buscar entrada por ID
 curl http://localhost:3000/fila/1
-
-# Atualizar status
-curl -X PUT http://localhost:3000/fila/1/status \
-  -H "Content-Type: application/json" \
-  -d '{"status":"CHAMADO","mesa_id":1}'
+curl -X PUT http://localhost:3000/fila/1/status -H "Content-Type: application/json" -d '{"status":"CHAMADO","mesa_id":1}'
 ```
 
-## Autores
+## Estrutura de teste recomendada
 
-Desenvolvido como projeto integrador da disciplina de Laboratório de Desenvolvimento de Aplicações Móveis e Distribuídas (LDAMD) - PUC Minas, Engenharia de Software, 1º Semestre 2026.
+Para conferir o fluxo completo, vale seguir esta ordem:
+
+1. Criar uma entrada com `POST /fila`.
+2. Listar a fila com `GET /fila`.
+3. Buscar a entrada com `GET /fila/:id`.
+4. Chamar o cliente com `PUT /fila/:id/status` e informar a mesa.
+5. Finalizar o atendimento com `PUT /fila/:id/status` marcando `ATENDIDO`.
+
+## Observação final
+
+O projeto foi mantido com uma base enxuta justamente para focar na regra de negócio principal da sprint. Mesmo assim, a documentação cobre o suficiente para entender a ideia, subir a API e validar o comportamento esperado sem depender de adivinhação.

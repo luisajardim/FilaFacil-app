@@ -9,7 +9,6 @@ const TRANSICOES_VALIDAS = {
 };
 
 async function entrarNaFila({ nome, quantidade_pessoas }) {
-  // Validações de entrada
   if (!nome || typeof nome !== 'string' || nome.trim() === '') {
     const err = new Error('O campo "nome" é obrigatório.');
     err.statusCode = 400;
@@ -27,10 +26,8 @@ async function entrarNaFila({ nome, quantidade_pessoas }) {
     throw err;
   }
 
-  // Encontra ou cria o cliente pelo nome
   const cliente = await clienteRepository.findOrCreate(nome.trim());
 
-  // Cria a entrada na fila
   const entrada = await filaRepository.create({
     cliente_id: cliente.id,
     quantidade_pessoas,
@@ -54,7 +51,6 @@ async function buscarPorId(id) {
 }
 
 async function atualizarStatus(id, { status, mesa_id }) {
-  // Validação: status obrigatório
   if (!status) {
     const err = new Error('O campo "status" é obrigatório.');
     err.statusCode = 400;
@@ -68,7 +64,6 @@ async function atualizarStatus(id, { status, mesa_id }) {
     throw err;
   }
 
-  // Busca a entrada atual
   const entrada = await filaRepository.findById(id);
   if (!entrada) {
     const err = new Error(`Entrada com id ${id} não encontrada.`);
@@ -87,7 +82,6 @@ async function atualizarStatus(id, { status, mesa_id }) {
     throw err;
   }
 
-  // Fluxo: AGUARDANDO → CHAMADO
   if (status === 'CHAMADO') {
     if (mesa_id === undefined || mesa_id === null) {
       const err = new Error('O campo "mesa_id" é obrigatório ao chamar um cliente.');
@@ -130,7 +124,6 @@ async function atualizarStatus(id, { status, mesa_id }) {
     }
   }
 
-  // Fluxo: CHAMADO → ATENDIDO
   if (status === 'ATENDIDO') {
     const mesa_id_atual = entrada.mesa ? entrada.mesa.id : null;
 
