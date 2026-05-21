@@ -7,8 +7,9 @@ async function findByNome(nome, db = null) {
 
 async function create(nome, db = null) {
   const database = db || await getDatabase();
-  const result = await database.run('INSERT INTO cliente (nome, criado_em) VALUES (?, datetime(\'now\'))', [nome]);
-  return { id: result.lastID, nome };
+  const criadoEm = new Date().toISOString();
+  await database.run('INSERT INTO cliente (nome, criado_em) VALUES (?, ?)', [nome, criadoEm]);
+  return findByNome(nome, database);
 }
 
 async function findOrCreate(nome, db = null) {

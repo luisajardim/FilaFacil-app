@@ -14,11 +14,13 @@ app.get('/', (req, res) => {
   res.json({
     sistema: 'FilaFácil',
     versao: '1.0.0',
+    arquitetura: ['REST', 'EDA', 'MOM'],
     endpoints: [
       'POST   /fila',
       'GET    /fila',
       'GET    /fila/:id',
       'PUT    /fila/:id/status',
+      'GET    /',
     ],
   });
 });
@@ -31,10 +33,10 @@ async function start() {
   try {
     await initDatabase();
     app.listen(PORT, () => {
-      console.log(`FilaFácil rodando na porta ${PORT}`);
+      console.log(`[API] FilaFácil rodando na porta ${PORT}`);
     });
   } catch (err) {
-    console.error('Erro ao iniciar a aplicação:', err);
+    console.error('[API] Erro ao iniciar a aplicação:', err);
     process.exit(1);
   }
 }

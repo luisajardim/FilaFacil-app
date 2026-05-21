@@ -51,12 +51,23 @@ async function findById(id, db = null) {
 
 async function create({ cliente_id, quantidade_pessoas }, db = null) {
   const database = db || await getDatabase();
+  const criadoEm = new Date().toISOString();
   const result = await database.run(
     `INSERT INTO fila (cliente_id, quantidade_pessoas, status, mesa_id, criado_em)
-     VALUES (?, ?, 'AGUARDANDO', NULL, datetime('now'))`,
-    [cliente_id, quantidade_pessoas]
+     VALUES (?, ?, 'AGUARDANDO', NULL, ?)`,
+    [cliente_id, quantidade_pessoas, criadoEm]
   );
-  return findById(result.lastID, database);
+
+  const filaId = result?.lastID;
+  if (!filaId) {
+    const fallback = await database.get(
+      'SELECT id FROM fila WHERE cliente_id = ? AND quantidade_pessoas = ? ORDER BY id DESC LIMIT 1',
+      [cliente_id, quantidade_pessoas]
+    );
+    return findById(fallback.id, database);
+  }
+
+  return findById(filaId, database);
 }
 
 async function updateStatus(id, { status, mesa_id }, db = null) {

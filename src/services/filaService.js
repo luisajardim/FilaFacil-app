@@ -2,6 +2,7 @@ const clienteRepository = require('../repositories/clienteRepository');
 const mesaRepository = require('../repositories/mesaRepository');
 const filaRepository = require('../repositories/filaRepository');
 const { getDatabase } = require('../database');
+const { publishEvent } = require('../rabbitmq/publisher');
 
 const TRANSICOES_VALIDAS = {
   AGUARDANDO: 'CHAMADO',
@@ -31,6 +32,14 @@ async function entrarNaFila({ nome, quantidade_pessoas }) {
   const entrada = await filaRepository.create({
     cliente_id: cliente.id,
     quantidade_pessoas,
+  });
+
+  await publishEvent('fila.criada', {
+    filaId: entrada.id,
+    cliente: entrada.cliente.nome,
+    quantidade_pessoas: entrada.quantidade_pessoas,
+    status: entrada.status,
+    timestamp: new Date().toISOString(),
   });
 
   return entrada;
@@ -111,7 +120,6 @@ async function atualizarStatus(id, { status, mesa_id }) {
       throw err;
     }
 
-    // Executa dentro de uma transação
     const db = await getDatabase();
     try {
       await db.exec('BEGIN TRANSACTION');
@@ -122,6 +130,15 @@ async function atualizarStatus(id, { status, mesa_id }) {
       await db.exec('ROLLBACK');
       throw e;
     }
+
+    const atualizado = await filaRepository.findById(id);
+    await publishEvent('fila.chamada', {
+      filaId: atualizado.id,
+      cliente: atualizado.cliente.nome,
+      mesaId: atualizado.mesa.id,
+      status: atualizado.status,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   if (status === 'ATENDIDO') {
@@ -139,6 +156,15 @@ async function atualizarStatus(id, { status, mesa_id }) {
       await db.exec('ROLLBACK');
       throw e;
     }
+
+    const atualizado = await filaRepository.findById(id);
+    await publishEvent('fila.finalizada', {
+      filaId: atualizado.id,
+      cliente: atualizado.cliente.nome,
+      mesaId: atualizado.mesa?.id ?? mesa_id_atual,
+      status: atualizado.status,
+      timestamp: new Date().toISOString(),
+    });
   }
 
   return filaRepository.findById(id);

@@ -1,67 +1,83 @@
 # FilaFácil
 
-O FilaFácil é uma API simples para controlar fila de espera de restaurante. A ideia é registrar quem está aguardando, chamar o cliente para uma mesa e depois marcar o atendimento como concluído, mantendo tudo salvo em SQLite.
+FilaFácil é um sistema de fila de espera para restaurantes construído com Node.js, Express, banco relacional e RabbitMQ. A Sprint 1 continua cuidando da persistência e das regras principais; a Sprint 2 adiciona comunicação assíncrona orientada a eventos, sem transformar a solução em microserviços.
 
-O projeto foi pensado para ser direto de usar e fácil de testar. Ao subir a aplicação, o banco é criado automaticamente, as mesas padrão são cadastradas e os endpoints já ficam prontos para consumo no Postman ou via cURL.
+## Arquitetura
+
+O fluxo segue EDA e MOM de forma simples:
+
+1. A API Express recebe a requisição e persiste no banco, que continua sendo a fonte de verdade.
+2. Depois do commit bem-sucedido, o publisher publica o evento no RabbitMQ.
+3. Um worker separado consome as mensagens e processa os eventos sem bloquear a API.
+
+As filas criadas são:
+
+- `fila.criada.queue`
+- `fila.chamada.queue`
+- `fila.finalizada.queue`
 
 ## Pré-requisitos
 
 - Node.js 18+
-- npm instalado junto com o Node.js
-- SQLite local gerado automaticamente pelo próprio projeto
+- npm
+- Docker e Docker Compose para subir o RabbitMQ
+- SQLite local ou PostgreSQL local
 
-## Instalação e execução
+## Instalação
 
 ```bash
 npm install
-cp .env.example .env
-npm start
+copy .env.example .env
 ```
 
-Se preferir, também dá para usar o modo de desenvolvimento com:
+## Variáveis de ambiente
+
+O arquivo `.env` usa os valores abaixo como base:
+
+```env
+PORT=3000
+RABBITMQ_URL=amqp://localhost
+DB_CLIENT=sqlite
+DB_PATH=./data/filafacil.sqlite
+```
+
+Se `DB_CLIENT=postgres`, o projeto também aceita `DATABASE_URL` ou os pares `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` e `PGPASSWORD`.
+
+## Como subir o RabbitMQ
+
+```bash
+npm run start:rabbit
+```
+
+O painel de administração fica em `http://localhost:15672` com usuário `guest` e senha `guest`.
+
+## Como iniciar a API
 
 ```bash
 npm run dev
 ```
 
-O arquivo `.env` já vem com o caminho padrão do banco, mas você pode ajustar `DB_PATH` se quiser guardar o SQLite em outro lugar. Se a variável `PORT` não for definida, a aplicação sobe na porta `3000`.
+Ou em modo normal:
 
-## O que a aplicação faz
+```bash
+npm start
+```
 
-O fluxo é simples:
+## Como iniciar o consumer
 
-1. O cliente entra na fila com nome e quantidade de pessoas.
-2. A entrada começa com o status `AGUARDANDO`.
-3. Quando a mesa é definida, o status passa para `CHAMADO`.
-4. Depois do atendimento, o status muda para `ATENDIDO` e a mesa volta a ficar disponível.
+Em outro terminal:
 
-## Estrutura
-
-- `src/app.js`: sobe o Express, registra as rotas e expõe a rota raiz com informações básicas da API.
-- `src/database.js`: abre a conexão com o SQLite, cria as tabelas e faz o seed das mesas padrão.
-- `src/routes`: concentra os endpoints da fila.
-- `src/controllers`: faz a ponte entre as requisições HTTP e a camada de serviço.
-- `src/services`: concentra as regras de negócio e as validações principais.
-- `src/repositories`: acessa os dados sem misturar regra de negócio com SQL.
-- `src/middlewares`: centraliza o tratamento de erros.
-
-## Modelo de dados
-
-O banco trabalha com três entidades principais:
-
-- `cliente`: guarda o nome do cliente e evita duplicidade quando ele entra na fila mais de uma vez.
-- `mesa`: representa as mesas disponíveis, com capacidade e status de disponibilidade.
-- `fila`: guarda a entrada na fila, relacionando cliente, quantidade de pessoas, mesa e status.
-
-As mesas 1, 2, 3 e 4 são criadas automaticamente na inicialização, com capacidades 2, 4, 4 e 8.
+```bash
+npm run consumer
+```
 
 ## Endpoints
 
 ### `POST /fila`
 
-Cria uma nova entrada na fila.
+Cria uma entrada na fila e publica `fila.criada` após salvar no banco.
 
-Body esperado:
+Body:
 
 ```json
 {
@@ -70,38 +86,19 @@ Body esperado:
 }
 ```
 
-Resposta típica:
-
-```json
-{
-  "id": 1,
-  "cliente": {
-    "id": 1,
-    "nome": "João"
-  },
-  "quantidade_pessoas": 4,
-  "status": "AGUARDANDO",
-  "mesa": null,
-  "criado_em": "2026-05-10T12:00:00.000Z"
-}
-```
-
 ### `GET /fila`
 
-Lista todas as entradas da fila em ordem de criação.
+Lista as entradas da fila.
 
 ### `GET /fila/:id`
 
-Busca uma entrada específica pelo ID.
+Busca uma entrada por ID.
 
 ### `PUT /fila/:id/status`
 
-Atualiza o status de uma entrada. O fluxo aceito hoje é:
+Atualiza o status da entrada.
 
-- `AGUARDANDO` para `CHAMADO`, informando `mesa_id`.
-- `CHAMADO` para `ATENDIDO`, sem necessidade de nova mesa.
-
-Exemplo de chamada:
+Exemplo para chamar cliente:
 
 ```json
 {
@@ -110,39 +107,85 @@ Exemplo de chamada:
 }
 ```
 
-Ao chamar o cliente, a mesa fica indisponível. Quando o atendimento é concluído, a mesa é liberada automaticamente.
+Exemplo para finalizar atendimento:
 
-## Regras e retornos
-
-- O nome do cliente é obrigatório.
-- A quantidade de pessoas precisa ser maior que zero.
-- A mesa precisa existir e ter capacidade para o grupo.
-- A mesa precisa estar disponível para ser vinculada ao cliente.
-- A API responde com `400` para dados inválidos, `404` quando o recurso não existe e `422` quando alguma regra de negócio é violada.
-
-## Como testar
-
-O jeito mais simples é importar `FilaFacil.postman_collection.json` no Postman e apontar a variável `baseUrl` para `http://localhost:3000`.
-
-Se preferir testar na mão, estes comandos resolvem o básico:
-
-```bash
-curl -X POST http://localhost:3000/fila -H "Content-Type: application/json" -d '{"nome":"Maria","quantidade_pessoas":2}'
-curl http://localhost:3000/fila
-curl http://localhost:3000/fila/1
-curl -X PUT http://localhost:3000/fila/1/status -H "Content-Type: application/json" -d '{"status":"CHAMADO","mesa_id":1}'
+```json
+{
+  "status": "ATENDIDO"
+}
 ```
 
-## Estrutura de teste recomendada
+## Eventos publicados
 
-Para conferir o fluxo completo, vale seguir esta ordem:
+### `fila.criada`
+
+```json
+{
+  "filaId": 1,
+  "cliente": "João",
+  "quantidade_pessoas": 4,
+  "status": "AGUARDANDO",
+  "timestamp": "2026-05-25T10:00:00Z"
+}
+```
+
+### `fila.chamada`
+
+```json
+{
+  "filaId": 1,
+  "cliente": "João",
+  "mesaId": 2,
+  "status": "CHAMADO",
+  "timestamp": "2026-05-25T10:05:00Z"
+}
+```
+
+### `fila.finalizada`
+
+```json
+{
+  "filaId": 1,
+  "cliente": "João",
+  "mesaId": 2,
+  "status": "ATENDIDO",
+  "timestamp": "2026-05-25T11:00:00Z"
+}
+```
+
+## Logs esperados
+
+- `[API]` para a API HTTP.
+- `[DATABASE]` para inicialização e seed do banco.
+- `[RABBITMQ]` para conexão e falhas de broker.
+- `[PUBLISHER]` para publicação dos eventos.
+- `[CONSUMER]` para o worker e consumo.
+
+Exemplos de saída do worker:
+
+```text
+[FILA_CRIADA]
+Cliente João entrou na fila com grupo de 4 pessoas
+
+[FILA_CHAMADA]
+Cliente João foi chamado para mesa 2
+
+[FILA_FINALIZADA]
+Atendimento finalizado para cliente João
+```
+
+## Demonstração esperada
 
 1. Criar uma entrada com `POST /fila`.
-2. Listar a fila com `GET /fila`.
-3. Buscar a entrada com `GET /fila/:id`.
-4. Chamar o cliente com `PUT /fila/:id/status` e informar a mesa.
-5. Finalizar o atendimento com `PUT /fila/:id/status` marcando `ATENDIDO`.
+2. Ver o banco salvar o registro e o publisher enviar `fila.criada`.
+3. Ver a mensagem no RabbitMQ Management UI.
+4. Ver o consumer processar a fila e exibir o log.
+5. Chamar o cliente com `PUT /fila/:id/status` e confirmar a publicação de `fila.chamada`.
+6. Finalizar o atendimento com `PUT /fila/:id/status` e confirmar a publicação de `fila.finalizada`.
 
-## Observação final
+## Observações de projeto
 
-O projeto foi mantido com uma base enxuta justamente para focar na regra de negócio principal da sprint. Mesmo assim, a documentação cobre o suficiente para entender a ideia, subir a API e validar o comportamento esperado sem depender de adivinhação.
+- O RabbitMQ não substitui o banco.
+- A API continua funcionando mesmo se o broker falhar, porque a publicação é tratada como efeito colateral.
+- A lógica de seleção automática de cliente ou mesa não foi adicionada.
+- O sistema permanece monolítico, com consumer separado apenas como worker assíncrono.
