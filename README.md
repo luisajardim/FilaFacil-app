@@ -183,6 +183,14 @@ Atendimento finalizado para cliente João
 5. Chamar o cliente com `PUT /fila/:id/status` e confirmar a publicação de `fila.chamada`.
 6. Finalizar o atendimento com `PUT /fila/:id/status` e confirmar a publicação de `fila.finalizada`.
 
+## Evidência Gravada
+
+Vídeo de demonstração da Sprint 2, caso não queira realizar o download:
+
+- https://youtu.be/IAJJ3c4NFOU
+
+Observação: o arquivo de evidência local também está postado no repositório com o nome de VÍDEO_evidência_sprint2.mp4, em sua versão comprimida do arquivo, pois a versão original estava passando dos 100mb permitidos pelo github. Por isso, também postei o vídeo no youtube para facilitar a avaliação pelo profesor. 
+
 ## Observações de projeto
 
 - O RabbitMQ não substitui o banco.
