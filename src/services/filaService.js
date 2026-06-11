@@ -1,0 +1,173 @@
+const clienteRepository = require('../repositories/clienteRepository');
+const mesaRepository = require('../repositories/mesaRepository');
+const filaRepository = require('../repositories/filaRepository');
+const { getDatabase } = require('../database');
+const { publishEvent } = require('../rabbitmq/publisher');
+
+const TRANSICOES_VALIDAS = {
+  AGUARDANDO: 'CHAMADO',
+  CHAMADO: 'ATENDIDO',
+};
+
+async function entrarNaFila({ nome, quantidade_pessoas }) {
+  if (!nome || typeof nome !== 'string' || nome.trim() === '') {
+    const err = new Error('O campo "nome" é obrigatório.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  if (
+    quantidade_pessoas === undefined ||
+    quantidade_pessoas === null ||
+    !Number.isInteger(quantidade_pessoas) ||
+    quantidade_pessoas < 1
+  ) {
+    const err = new Error('O campo "quantidade_pessoas" deve ser um inteiro maior ou igual a 1.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const cliente = await clienteRepository.findOrCreate(nome.trim());
+
+  const entrada = await filaRepository.create({
+    cliente_id: cliente.id,
+    quantidade_pessoas,
+  });
+
+  await publishEvent('fila.criada', {
+    filaId: entrada.id,
+    cliente: entrada.cliente.nome,
+    quantidade_pessoas: entrada.quantidade_pessoas,
+    status: entrada.status,
+    timestamp: new Date().toISOString(),
+  });
+
+  return entrada;
+}
+
+async function listarFila() {
+  return filaRepository.findAll();
+}
+
+async function buscarPorId(id) {
+  const entrada = await filaRepository.findById(id);
+  if (!entrada) {
+    const err = new Error(`Entrada com id ${id} não encontrada.`);
+    err.statusCode = 404;
+    throw err;
+  }
+  return entrada;
+}
+
+async function atualizarStatus(id, { status, mesa_id }) {
+  if (!status) {
+    const err = new Error('O campo "status" é obrigatório.');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const statusValidos = ['AGUARDANDO', 'CHAMADO', 'ATENDIDO'];
+  if (!statusValidos.includes(status)) {
+    const err = new Error(`Status inválido. Valores aceitos: ${statusValidos.join(', ')}.`);
+    err.statusCode = 400;
+    throw err;
+  }
+
+  const entrada = await filaRepository.findById(id);
+  if (!entrada) {
+    const err = new Error(`Entrada com id ${id} não encontrada.`);
+    err.statusCode = 404;
+    throw err;
+  }
+
+  // Valida transição de estado
+  const proximoEstadoValido = TRANSICOES_VALIDAS[entrada.status];
+  if (status !== proximoEstadoValido) {
+    const err = new Error(
+      `Transição inválida: não é possível mudar de "${entrada.status}" para "${status}". ` +
+      `A próxima transição válida é: "${proximoEstadoValido}".`
+    );
+    err.statusCode = 422;
+    throw err;
+  }
+
+  if (status === 'CHAMADO') {
+    if (mesa_id === undefined || mesa_id === null) {
+      const err = new Error('O campo "mesa_id" é obrigatório ao chamar um cliente.');
+      err.statusCode = 400;
+      throw err;
+    }
+
+    const mesa = await mesaRepository.findById(mesa_id);
+    if (!mesa) {
+      const err = new Error(`Mesa com id ${mesa_id} não encontrada.`);
+      err.statusCode = 404;
+      throw err;
+    }
+
+    if (!mesa.disponivel) {
+      const err = new Error(`Mesa ${mesa_id} não está disponível.`);
+      err.statusCode = 422;
+      throw err;
+    }
+
+    if (mesa.capacidade < entrada.quantidade_pessoas) {
+      const err = new Error(
+        `Mesa ${mesa_id} tem capacidade para ${mesa.capacidade} pessoa(s), ` +
+        `mas o grupo possui ${entrada.quantidade_pessoas} pessoa(s).`
+      );
+      err.statusCode = 422;
+      throw err;
+    }
+
+    const db = await getDatabase();
+    try {
+      await db.exec('BEGIN TRANSACTION');
+      await filaRepository.updateStatus(id, { status: 'CHAMADO', mesa_id }, db);
+      await mesaRepository.setDisponivel(mesa_id, false, db);
+      await db.exec('COMMIT');
+    } catch (e) {
+      await db.exec('ROLLBACK');
+      throw e;
+    }
+
+    const atualizado = await filaRepository.findById(id);
+    await publishEvent('fila.chamada', {
+      filaId: atualizado.id,
+      cliente: atualizado.cliente.nome,
+      mesaId: atualizado.mesa.id,
+      status: atualizado.status,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  if (status === 'ATENDIDO') {
+    const mesa_id_atual = entrada.mesa ? entrada.mesa.id : null;
+
+    const db = await getDatabase();
+    try {
+      await db.exec('BEGIN TRANSACTION');
+      await filaRepository.updateStatus(id, { status: 'ATENDIDO' }, db);
+      if (mesa_id_atual) {
+        await mesaRepository.setDisponivel(mesa_id_atual, true, db);
+      }
+      await db.exec('COMMIT');
+    } catch (e) {
+      await db.exec('ROLLBACK');
+      throw e;
+    }
+
+    const atualizado = await filaRepository.findById(id);
+    await publishEvent('fila.finalizada', {
+      filaId: atualizado.id,
+      cliente: atualizado.cliente.nome,
+      mesaId: atualizado.mesa?.id ?? mesa_id_atual,
+      status: atualizado.status,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  return filaRepository.findById(id);
+}
+
+module.exports = { entrarNaFila, listarFila, buscarPorId, atualizarStatus };

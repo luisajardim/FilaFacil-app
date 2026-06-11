@@ -1,0 +1,23 @@
+{
+  "name": "filafacil",
+  "version": "1.0.0",
+  "description": "Sistema de fila de espera para restaurante",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "consumer": "node src/workers/eventConsumer.js",
+    "start:rabbit": "docker-compose up -d"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "pg": "^8.12.0",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+}
