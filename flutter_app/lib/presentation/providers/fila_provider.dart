@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -18,6 +20,8 @@ class FilaProvider extends ChangeNotifier {
   bool _loading = false;
   bool _mesasLoading = false;
   String? _error;
+  Timer? _mesasTimer;
+  FilaStatus? _lastStatus;
 
   List<FilaModel> get fila => _fila;
   List<MesaModel> get mesas => _mesas;
@@ -93,6 +97,17 @@ class FilaProvider extends ChangeNotifier {
     } catch (_) {}
     _mesasLoading = false;
     notifyListeners();
+    _startMesasPolling();
+  }
+
+  void _startMesasPolling() {
+    _mesasTimer?.cancel();
+    _mesasTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      try {
+        _mesas = await _mesaRepository.fetchAll();
+        notifyListeners();
+      } catch (_) {}
+    });
   }
 
   Future<void> entrarNaFila({
@@ -129,11 +144,20 @@ class FilaProvider extends ChangeNotifier {
 
   void _startPolling() {
     if (_minhaEntrada == null) return;
+    _lastStatus = _minhaEntrada!.status;
     _notificationService.startPolling(_minhaEntrada!.id, (updated) {
+      final statusChanged = updated.status != _lastStatus;
+      _lastStatus = updated.status;
       _minhaEntrada = updated;
       final idx = _fila.indexWhere((e) => e.id == updated.id);
       if (idx != -1) _fila[idx] = updated;
       notifyListeners();
+      if (statusChanged && _mesas.isNotEmpty) {
+        _mesaRepository.fetchAll().then((mesas) {
+          _mesas = mesas;
+          notifyListeners();
+        }).catchError((_) {});
+      }
     });
   }
 
@@ -145,6 +169,7 @@ class FilaProvider extends ChangeNotifier {
   @override
   void dispose() {
     _notificationService.stopPolling();
+    _mesasTimer?.cancel();
     super.dispose();
   }
 }

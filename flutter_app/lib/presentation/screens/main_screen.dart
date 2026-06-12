@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../domain/models/fila_model.dart';
 import '../providers/fila_provider.dart';
-import 'chamado_screen.dart';
 import 'entrar_fila_screen.dart';
 import 'lista_fila_screen.dart';
 import 'mesas_screen.dart';
@@ -22,7 +21,6 @@ class _MainScreenState extends State<MainScreen> {
   static const _screens = [
     EntrarFilaScreen(),
     ListaFilaScreen(),
-    ChamadoScreen(),
     MesasScreen(),
   ];
 
@@ -92,17 +90,12 @@ class _MainScreenState extends State<MainScreen> {
             activeIcon: Icon(Icons.edit),
             label: 'Entrar',
           ),
-          const BottomNavigationBarItem(
-            icon: Icon(Icons.format_list_bulleted_outlined),
-            activeIcon: Icon(Icons.format_list_bulleted),
-            label: 'Fila',
-          ),
           BottomNavigationBarItem(
             icon: isChamado
                 ? Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      const Icon(Icons.notifications_outlined),
+                      const Icon(Icons.format_list_bulleted_outlined),
                       Positioned(
                         right: -2,
                         top: -2,
@@ -117,12 +110,12 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   )
-                : const Icon(Icons.notifications_outlined),
+                : const Icon(Icons.format_list_bulleted_outlined),
             activeIcon: isChamado
                 ? Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      const Icon(Icons.notifications),
+                      const Icon(Icons.format_list_bulleted),
                       Positioned(
                         right: -2,
                         top: -2,
@@ -137,8 +130,8 @@ class _MainScreenState extends State<MainScreen> {
                       ),
                     ],
                   )
-                : const Icon(Icons.notifications),
-            label: 'Chamado',
+                : const Icon(Icons.format_list_bulleted),
+            label: 'Fila',
           ),
           const BottomNavigationBarItem(
             icon: Icon(Icons.table_restaurant_outlined),
