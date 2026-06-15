@@ -1,6 +1,12 @@
 # FilaFácil
 
-FilaFácil é um sistema de fila de espera para restaurantes construído com Node.js, Express, banco relacional e RabbitMQ. A Sprint 1 continua cuidando da persistência e das regras principais; a Sprint 2 adiciona comunicação assíncrona orientada a eventos, sem transformar a solução em microserviços.
+FilaFácil é um sistema distribuído de fila de espera para restaurantes. O cliente entra na fila pelo app móvel e é notificado quando sua mesa ficar disponível; o prestador (operador do restaurante) gerencia chamadas e status pelo backend.
+
+O projeto é composto por três componentes:
+
+- **Backend REST** — Node.js + Express, persiste dados em SQLite/PostgreSQL e publica eventos no RabbitMQ.
+- **Middleware de Mensagens (MOM)** — RabbitMQ com filas de eventos orientadas a domínio (Sprint 2).
+- **App Flutter — Cliente** — Aplicativo móvel em Flutter/Dart que consome a API REST e atualiza o estado via polling assíncrono (Sprint 3).
 
 ## Arquitetura
 
@@ -18,16 +24,31 @@ As filas criadas são:
 
 ## Pré-requisitos
 
+**Backend:**
 - Node.js 18+
 - npm
-- Docker e Docker Compose para subir o RabbitMQ
+- Docker e Docker Compose (para subir o RabbitMQ)
 - SQLite local ou PostgreSQL local
 
+**App Flutter (Cliente):**
+- Flutter 3.10+ e Dart 3.x
+- Android Studio ou VS Code com extensão Flutter
+- Emulador Android/iOS ou dispositivo físico
+
 ## Instalação
+
+**Backend:**
 
 ```bash
 npm install
 copy .env.example .env
+```
+
+**App Flutter (Cliente):**
+
+```bash
+cd flutter_app
+flutter pub get
 ```
 
 ## Variáveis de ambiente
@@ -69,6 +90,38 @@ Em outro terminal:
 
 ```bash
 npm run consumer
+```
+
+## Como iniciar o App Flutter (Cliente)
+
+Com o backend e o RabbitMQ já em execução, em outro terminal:
+
+```bash
+cd flutter_app
+flutter run
+```
+
+O app conecta por padrão em `http://localhost:3000`. Para rodar em dispositivo físico ou emulador com backend na máquina local, atualize `BASE_URL` em `lib/core/constants/api_constants.dart` com o IP da sua máquina na rede local.
+
+### Telas disponíveis
+
+| Tela | Descrição |
+|------|-----------|
+| Entrar na Fila | Formulário para o cliente entrar na fila informando nome e número de pessoas |
+| Lista da Fila | Exibe a posição do usuário na fila e o status (Aguardando / Chamado / Atendido) |
+| Mesas | Mostra a disponibilidade de mesas em tempo real |
+
+O app atualiza o estado automaticamente via polling a cada **7 segundos** (status da fila) e **5 segundos** (disponibilidade de mesas), sem necessidade de ação manual do usuário.
+
+### Arquitetura do App Flutter
+
+O app segue Clean Architecture com quatro camadas:
+
+```
+presentation/   → Screens, Widgets, Providers (gerência de estado com Provider)
+application/    → Services e Use Cases (FilaService, NotificationService)
+domain/         → Models/Entities (FilaModel, ClienteModel, MesaModel)
+infrastructure/ → Repositories com chamadas HTTP (FilaRepository, MesaRepository)
 ```
 
 ## Endpoints
@@ -183,13 +236,17 @@ Atendimento finalizado para cliente João
 5. Chamar o cliente com `PUT /fila/:id/status` e confirmar a publicação de `fila.chamada`.
 6. Finalizar o atendimento com `PUT /fila/:id/status` e confirmar a publicação de `fila.finalizada`.
 
-## Evidência Gravada
+## Evidências Gravadas
 
-Vídeo de demonstração da Sprint 2, caso não queira realizar o download:
+**Sprint 2 — Integração MOM (RabbitMQ):**
 
 - https://youtu.be/IAJJ3c4NFOU
 
-Observação: o arquivo de evidência local também está postado no repositório com o nome de VÍDEO_evidência_sprint2.mp4, em sua versão comprimida do arquivo, pois a versão original estava passando dos 100mb permitidos pelo github. Por isso, também postei o vídeo no youtube para facilitar a avaliação pelo profesor. 
+**Sprint 3 — App Flutter (Cliente):**
+
+- https://youtu.be/7_15n1wKLTw?si=HDy1ScnnQi-3SQQe
+
+Observação: os arquivos de evidência locais também estão postados no repositório em suas versões comprimidas, pois os originais ultrapassavam os 100 MB permitidos pelo GitHub.
 
 ## Observações de projeto
 
