@@ -1,105 +1,147 @@
 # FilaFácil
 
-FilaFácil é um sistema distribuído de fila de espera para restaurantes. O cliente entra na fila pelo app móvel e é notificado quando sua mesa ficar disponível; o operador do restaurante (prestador) gerencia chamadas e status pelo backend.
+FilaFácil é um sistema distribuído de fila de espera para restaurantes. O cliente entra na fila pelo app móvel e é notificado quando sua mesa fica disponível; o operador gerencia chamadas e mesas pelo próprio app Flutter.
 
 **Projeto Integrador — LDAMD | PUC Minas | Engenharia de Software | 1º Semestre 2026**
 
 ---
 
-# Visão Geral do Sistema
+## Sumário
 
-O sistema é composto por três componentes que se comunicam de forma assíncrona:
-
-| Componente            | Tecnologia                            | Função                                                        |
-| --------------------- | ------------------------------------- | ------------------------------------------------------------- |
-| Backend REST          | Node.js + Express + SQLite/PostgreSQL | Persiste dados, expõe endpoints e publica eventos no MOM      |
-| Middleware (MOM)      | RabbitMQ                              | Recebe eventos do backend e os distribui aos consumidores     |
-| App Flutter — Cliente | Flutter/Dart                          | Consome a API REST e atualiza o estado via polling assíncrono |
-
----
-
-# Pré-requisitos
-
-## Backend
-
-* Node.js 18+
-* npm
-* Docker e Docker Compose (para RabbitMQ)
-* SQLite local ou PostgreSQL local
-
-## App Flutter (Cliente)
-
-* Flutter 3.10+ e Dart 3.x
-* Android Studio ou VS Code com extensão Flutter
-* Emulador Android/iOS ou dispositivo físico
+1. [Visão Geral](#visão-geral)
+2. [Pré-requisitos](#pré-requisitos)
+3. [Instalação e Execução](#instalação-e-execução)
+4. [Variáveis de Ambiente](#variáveis-de-ambiente)
+5. [Banco de Dados](#banco-de-dados)
+6. [API REST](#api-rest)
+7. [Eventos MOM (RabbitMQ)](#eventos-mom-rabbitmq)
+8. [Apps Flutter](#apps-flutter)
+9. [Fluxo Ponta a Ponta](#fluxo-ponta-a-ponta)
+10. [Entregas por Sprint](#entregas-por-sprint)
+11. [Observações](#observações)
 
 ---
 
-# Instalação e Execução
+## Visão Geral
 
-## 1. Backend
+O sistema é composto por quatro componentes que se comunicam de forma assíncrona:
+
+| Componente              | Tecnologia                            | Função                                                        |
+| ----------------------- | ------------------------------------- | ------------------------------------------------------------- |
+| Backend REST            | Node.js + Express + SQLite/PostgreSQL | Persiste dados, expõe endpoints e publica eventos no MOM      |
+| Middleware (MOM)        | RabbitMQ                              | Recebe eventos do backend e os distribui aos consumidores     |
+| App Flutter — Cliente   | Flutter/Dart                          | Permite ao cliente entrar na fila e acompanhar seu status     |
+| App Flutter — Prestador | Flutter/Dart                          | Permite ao operador gerenciar a fila e as mesas em tempo real |
+
+```text
+[App Flutter — Cliente]   [App Flutter — Prestador]
+         |                          |
+         | HTTP REST (polling)      | HTTP REST (polling)
+         ↓                          ↓
+           [Backend Express — API REST]
+                    |            |
+                    | SQL        | AMQP
+                    ↓            ↓
+               [SQLite /     [RabbitMQ]
+               PostgreSQL]       |
+                                 ↓
+                          [Worker Consumer]
+```
+
+O fluxo segue **EDA (Event-Driven Architecture)**:
+
+1. A API recebe a requisição e persiste no banco, que permanece como fonte de verdade.
+2. Após o commit bem-sucedido, o publisher publica o evento no RabbitMQ.
+3. O worker consumer processa as mensagens de forma assíncrona, sem bloquear a API.
+
+---
+
+## Pré-requisitos
+
+**Backend**
+- Node.js 18+, npm
+- Docker e Docker Compose (para RabbitMQ)
+- SQLite local ou PostgreSQL local
+
+**Apps Flutter**
+- Flutter 3.10+ e Dart 3.x
+- Android Studio ou VS Code com extensão Flutter
+- Emulador Android/iOS ou dispositivo físico
+
+---
+
+## Instalação e Execução
+
+### 1. Instalar dependências do backend
 
 ```bash
 npm install
 copy .env.example .env
 ```
 
-## 2. App Flutter
+### 2. Instalar dependências dos apps Flutter
 
 ```bash
 cd flutter_app
 flutter pub get
+cd ../flutter_prestador
+flutter pub get
 ```
 
-## 3. Subir o RabbitMQ
+### 3. Subir o RabbitMQ
 
 ```bash
 npm run start:rabbit
 ```
 
-Painel de administração: `http://localhost:15672`
+Painel de administração: `http://localhost:15672` — usuário `guest`, senha `guest`
 
-**Usuário:** `guest`
-**Senha:** `guest`
-
-## 4. Iniciar a API
+### 4. Iniciar a API
 
 ```bash
 npm run dev
 ```
 
-## 5. Iniciar o Consumer (outro terminal)
+### 5. Iniciar o Consumer (outro terminal)
 
 ```bash
 npm run consumer
 ```
 
-## 6. Iniciar o App Flutter (outro terminal)
+### 6. Iniciar o App do Cliente (outro terminal)
 
 ```bash
 cd flutter_app
 flutter run
 ```
 
-O app conecta por padrão em:
+### 7. Iniciar o App do Prestador (outro terminal)
 
-```text
-http://localhost:3000
+```bash
+cd flutter_prestador
+flutter run
 ```
 
-Para rodar em dispositivo físico, atualize `baseUrl` em:
+> Para rodar ambos os apps simultaneamente, use dois emuladores ou `flutter run -d <device-id>` em terminais separados.
 
-```text
-lib/core/constants/api_constants.dart
+### Configuração de IP
+
+Por padrão os apps conectam em `http://localhost:3000`. Para outros ambientes, atualize `baseUrl` em:
+
+```
+flutter_app/lib/core/constants/api_constants.dart
+flutter_prestador/lib/core/constants/api_constants.dart
 ```
 
-com o IP da máquina na rede local.
+| Ambiente                    | URL                          |
+| --------------------------- | ---------------------------- |
+| Desktop / iOS Simulator     | `http://localhost:3000`      |
+| Emulador Android            | `http://10.0.2.2:3000`       |
+| Dispositivo físico (LAN)    | `http://<IP-da-máquina>:3000`|
 
 ---
 
-# Variáveis de Ambiente
-
-O arquivo `.env` usa os valores abaixo como base:
+## Variáveis de Ambiente
 
 ```env
 PORT=3000
@@ -108,50 +150,7 @@ DB_CLIENT=sqlite
 DB_PATH=./data/filafacil.sqlite
 ```
 
-Se `DB_CLIENT=postgres`, também são aceitos:
-
-* `DATABASE_URL`
-* `PGHOST`
-* `PGPORT`
-* `PGDATABASE`
-* `PGUSER`
-* `PGPASSWORD`
-
----
-
-# Sprint 1 — Arquitetura e Backend REST
-
-**Prazo:** 11/05/2026
-**Pontuação:** 20 pts
-
-## Domínio
-
-Sistema de fila de espera para restaurantes.
-
-O cliente (usuário final) entra na fila pelo app móvel e acompanha sua posição em tempo real. O prestador (operador do restaurante) gerencia o estado da fila e das mesas pelo backend.
-
-## Arquitetura
-
-```text
-[App Flutter — Cliente]
-         |
-         | HTTP REST (polling)
-         ↓
-[Backend Express — API REST]
-         |            |
-         | SQL         | AMQP
-         ↓            ↓
-    [SQLite /     [RabbitMQ]
-    PostgreSQL]       |
-                      ↓
-               [Worker Consumer]
-```
-
-O fluxo segue **EDA (Event-Driven Architecture)**:
-
-1. A API recebe a requisição e persiste no banco, que permanece como fonte de verdade.
-2. Após o commit bem-sucedido, o publisher publica o evento no RabbitMQ.
-3. O worker consumer processa as mensagens de forma assíncrona, sem bloquear a API.
+Se `DB_CLIENT=postgres`, também são aceitos: `DATABASE_URL`, `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, `PGPASSWORD`.
 
 ---
 
@@ -178,7 +177,7 @@ O fluxo segue **EDA (Event-Driven Architecture)**:
 
 ---
 
-## Endpoints REST
+## API REST
 
 | Método | Rota               | Descrição                            |
 | ------ | ------------------ | ------------------------------------ |
@@ -190,106 +189,54 @@ O fluxo segue **EDA (Event-Driven Architecture)**:
 
 ### POST `/fila`
 
-Cria uma entrada na fila e publica o evento `fila.criada` no RabbitMQ.
-
 ```json
-{
-  "nome": "João",
-  "quantidade_pessoas": 4
-}
+{ "nome": "João", "quantidade_pessoas": 4 }
 ```
 
-### PUT `/fila/:id/status` — Chamar Cliente
+### PUT `/fila/:id/status` — Chamar cliente
 
 ```json
-{
-  "status": "CHAMADO",
-  "mesa_id": 2
-}
+{ "status": "CHAMADO", "mesa_id": 2 }
 ```
 
-### PUT `/fila/:id/status` — Finalizar Atendimento
+### PUT `/fila/:id/status` — Finalizar atendimento
 
 ```json
-{
-  "status": "ATENDIDO"
-}
+{ "status": "ATENDIDO" }
 ```
 
 ---
 
-# Sprint 2 — Integração com MOM (RabbitMQ)
+## Eventos MOM (RabbitMQ)
 
-**Prazo:** 25/05/2026
-**Pontuação:** 20 pts
+### Filas
 
-## Filas Criadas
+- `fila.criada.queue`
+- `fila.chamada.queue`
+- `fila.finalizada.queue`
 
-* `fila.criada.queue`
-* `fila.chamada.queue`
-* `fila.finalizada.queue`
+### Tabela de Eventos
 
----
+| Evento          | Disparado em                         | Fila                  |
+| --------------- | ------------------------------------ | --------------------- |
+| fila.criada     | POST `/fila`                         | fila.criada.queue     |
+| fila.chamada    | PUT `/fila/:id/status` → CHAMADO     | fila.chamada.queue    |
+| fila.finalizada | PUT `/fila/:id/status` → ATENDIDO    | fila.finalizada.queue |
 
-## Documentação dos Eventos
-
-| Evento          | Produtor                             | Consumidor                | Tópico/Fila           | Payload                                                                                                         |
-| --------------- | ------------------------------------ | ------------------------- | --------------------- | --------------------------------------------------------------------------------------------------------------- |
-| fila.criada     | API Express — POST `/fila`           | Worker `eventConsumer.js` | fila.criada.queue     | `{"filaId":1,"cliente":"João","quantidade_pessoas":4,"status":"AGUARDANDO","timestamp":"2026-05-25T10:00:00Z"}` |
-| fila.chamada    | API Express — PUT `/fila/:id/status` | Worker `eventConsumer.js` | fila.chamada.queue    | `{"filaId":1,"cliente":"João","mesaId":2,"status":"CHAMADO","timestamp":"2026-05-25T10:05:00Z"}`                |
-| fila.finalizada | API Express — PUT `/fila/:id/status` | Worker `eventConsumer.js` | fila.finalizada.queue | `{"filaId":1,"cliente":"João","mesaId":2,"status":"ATENDIDO","timestamp":"2026-05-25T11:00:00Z"}`               |
-
----
-
-## Payloads Completos
-
-### fila.criada
+### Payloads
 
 ```json
-{
-  "filaId": 1,
-  "cliente": "João",
-  "quantidade_pessoas": 4,
-  "status": "AGUARDANDO",
-  "timestamp": "2026-05-25T10:00:00Z"
-}
+// fila.criada
+{ "filaId": 1, "cliente": "João", "quantidade_pessoas": 4, "status": "AGUARDANDO", "timestamp": "..." }
+
+// fila.chamada
+{ "filaId": 1, "cliente": "João", "mesaId": 2, "status": "CHAMADO", "timestamp": "..." }
+
+// fila.finalizada
+{ "filaId": 1, "cliente": "João", "mesaId": 2, "status": "ATENDIDO", "timestamp": "..." }
 ```
 
-### fila.chamada
-
-```json
-{
-  "filaId": 1,
-  "cliente": "João",
-  "mesaId": 2,
-  "status": "CHAMADO",
-  "timestamp": "2026-05-25T10:05:00Z"
-}
-```
-
-### fila.finalizada
-
-```json
-{
-  "filaId": 1,
-  "cliente": "João",
-  "mesaId": 2,
-  "status": "ATENDIDO",
-  "timestamp": "2026-05-25T11:00:00Z"
-}
-```
-
----
-
-## Comunicação Assíncrona
-
-O consumer é um processo separado (`src/workers/eventConsumer.js`) que consome as filas sem chamadas REST diretas ao backend.
-
-A API publica o evento como efeito colateral após o commit bem-sucedido; se o broker estiver indisponível, a publicação é descartada silenciosamente e a API continua funcionando normalmente.
-
----
-
-## Logs Esperados
+### Logs do Worker
 
 | Prefixo       | Camada                        |
 | ------------- | ----------------------------- |
@@ -299,161 +246,89 @@ A API publica o evento como efeito colateral após o commit bem-sucedido; se o b
 | `[PUBLISHER]` | Publicação de eventos         |
 | `[CONSUMER]`  | Worker e consumo de mensagens |
 
-### Exemplo de saída do Worker
-
 ```text
-[FILA_CRIADA]
-Cliente João entrou na fila com grupo de 4 pessoas
-
-[FILA_CHAMADA]
-Cliente João foi chamado para mesa 2
-
-[FILA_FINALIZADA]
-Atendimento finalizado para cliente João
+[FILA_CRIADA]    Cliente João entrou na fila com grupo de 4 pessoas
+[FILA_CHAMADA]   Cliente João foi chamado para mesa 2
+[FILA_FINALIZADA] Atendimento finalizado para cliente João
 ```
 
 ---
 
-# Sprint 3 — Aplicativo Flutter (Cliente)
+## Apps Flutter
 
-**Prazo:** 15/06/2026
-**Pontuação:** 20 pts
+Ambos os apps seguem **Clean Architecture** com camadas `presentation`, `application`, `domain` e `infrastructure`.
 
-## Telas
+### App Cliente (`flutter_app/`)
 
 | Tela           | Descrição                                                   |
 | -------------- | ----------------------------------------------------------- |
-| Entrar na Fila | Formulário para o cliente informar nome e número de pessoas |
+| Entrar na Fila | Formulário para informar nome e número de pessoas           |
 | Lista da Fila  | Exibe posição na fila e status atual                        |
 | Mesas          | Mostra a disponibilidade de mesas em tempo real             |
 
----
-
-## Arquitetura do App (Clean Architecture)
-
-```text
-flutter_app/lib/
-├── presentation/
-│   ├── Screens
-│   ├── Widgets
-│   └── Providers
-├── application/
-│   └── Services
-├── domain/
-│   └── Models/Entities
-└── infrastructure/
-    └── Repositories
-```
-
-A separação garante que a camada de apresentação não conheça detalhes de rede ou persistência; toda comunicação com o backend passa pelos repositórios da camada de infraestrutura.
-
----
-
-## Atualização Assíncrona de Estado — Polling
-
-O app atualiza o estado automaticamente por meio de dois timers independentes.
-
-### Status da fila — a cada 7 segundos
-
-```dart
-static const Duration pollingInterval = Duration(seconds: 7);
-```
-
-Serviço responsável:
-
-```dart
-void startPolling(int filaId, StatusCallback onUpdate) {
-  _timer?.cancel();
-  _timer = Timer.periodic(ApiConstants.pollingInterval, (_) async {
-    try {
-      final updated = await _repository.fetchById(filaId);
-      onUpdate(updated);
-    } catch (_) {
-      // erros de rede transientes são ignorados
-    }
-  });
-}
-```
-
-O polling é iniciado:
-
-* Na inicialização do `FilaProvider`
-* Após o cliente entrar na fila
-
-### Disponibilidade de mesas — a cada 5 segundos
-
-```dart
-void _startMesasPolling() {
-  _mesasTimer?.cancel();
-
-  _mesasTimer = Timer.periodic(
-    const Duration(seconds: 5),
-    (_) async {
-      try {
-        _mesas = await _mesaRepository.fetchAll();
-        notifyListeners();
-      } catch (_) {}
-    },
-  );
-}
-```
-
-Ativado ao entrar na tela de Mesas via `carregarMesas()`.
-
----
-
-## Ciclo de Vida dos Timers
+**Polling automático:**
 
 | Timer                    | Intervalo | Inicia em                        | Cancela em                   |
 | ------------------------ | --------- | -------------------------------- | ---------------------------- |
 | Status da fila           | 7 s       | `entrarNaFila()` / inicialização | `sairDaFila()` / `dispose()` |
 | Disponibilidade de mesas | 5 s       | `carregarMesas()`                | `dispose()`                  |
 
----
+### App Prestador (`flutter_prestador/`)
 
-# Sprint 4 — App do Prestador e Integração Final
+| Tela   | Descrição                                                                              |
+| ------ | -------------------------------------------------------------------------------------- |
+| Fila   | Lista de clientes aguardando; permite chamar o próximo e atribuir uma mesa             |
+| Mesas  | Exibe status de cada mesa (livre/ocupada/capacidade); permite liberar mesa manualmente |
+| Painel | Dashboard com estatísticas em tempo real: fila, mesas livres, total atendidos          |
 
-**Prazo:** 03/07/2026
-**Pontuação:** 20 pts
+**Polling automático:** `OperadorProvider` atualiza fila e mesas em paralelo a cada **5 segundos**, iniciando automaticamente ao ser criado.
 
-## Entregas Previstas
+```dart
+_timer = Timer.periodic(ApiConstants.pollingInterval, (_) => _silentRefresh());
 
-* App Flutter funcional para o operador do restaurante (prestador)
-* Fluxo completo ponta a ponta:
-
-  * Cliente entra na fila
-  * Backend publica evento no MOM
-  * Prestador é notificado
-  * Prestador chama cliente
-  * Cliente é notificado
-* Screencast de demonstração (3–5 min)
-* Relatório Técnico Final (mínimo 4 páginas)
-
----
-
-# Evidências Gravadas
-
-## Sprint 2 — Integração MOM (RabbitMQ)
-
-```text
-https://youtu.be/IAJJ3c4NFOU
+Future<void> _silentRefresh() async {
+  final results = await Future.wait([_service.listarFila(), _service.listarMesas()]);
+  _fila  = results[0] as List<FilaModel>;
+  _mesas = results[1] as List<MesaModel>;
+  notifyListeners();
+}
 ```
 
-## Sprint 3 — App Flutter (Cliente)
+---
+
+## Fluxo Ponta a Ponta
 
 ```text
-https://youtu.be/7_15n1wKLTw?si=HDy1ScnnQi-3SQQe
+1. Cliente entra na fila pelo app
+2. Backend persiste e publica fila.criada no RabbitMQ
+3. Worker consumer processa o evento (log assíncrono)
+4. App do prestador detecta novo cliente via polling (≤ 5 s)
+5. Operador chama o cliente e atribui uma mesa
+6. Backend publica fila.chamada; mesa marcada como ocupada
+7. App do cliente detecta status CHAMADO via polling (≤ 7 s)
+8. Operador finaliza o atendimento; mesa liberada automaticamente
+9. Backend publica fila.finalizada
 ```
-
-Não consegui fazer o upload dos arquivos no github devido ao tamanho. 
 
 ---
 
-# Observações de Projeto
+## Entregas por Sprint
 
-* O RabbitMQ não substitui o banco de dados; o banco permanece como fonte de verdade.
-* A publicação de eventos é tratada como efeito colateral.
-* A API continua funcionando mesmo se o broker falhar.
-* A lógica de seleção automática de cliente ou mesa não foi implementada.
-* O operador realiza a chamada manualmente pelo backend.
-* O sistema permanece monolítico, com o consumer separado apenas como worker assíncrono.
+| Sprint | Prazo      | Pontos | Entrega principal                              | Vídeo                                          |
+| ------ | ---------- | ------ | ---------------------------------------------- | ---------------------------------------------- |
+| 1      | 11/05/2026 | 20 pts | Arquitetura, banco de dados e API REST         | —                                              |
+| 2      | 25/05/2026 | 20 pts | Integração com RabbitMQ (MOM)                  | https://youtu.be/IAJJ3c4NFOU                  |
+| 3      | 15/06/2026 | 20 pts | App Flutter do cliente com polling assíncrono  | https://youtu.be/7_15n1wKLTw?si=HDy1ScnnQi-3SQQe |
+| 4      | 03/07/2026 | 20 pts | App Flutter do prestador + integração final    | https://youtu.be/1rmlek3UXvU                  |
+
+> Os vídeos não foram enviados ao GitHub por restrições de tamanho de arquivo.
+
+---
+
+## Observações
+
+- O RabbitMQ não substitui o banco de dados; o banco permanece como fonte de verdade.
+- A publicação de eventos é efeito colateral: se o broker falhar, a API continua funcionando.
+- Os apps Flutter não se conectam diretamente ao RabbitMQ; utilizam polling HTTP sobre a API REST.
+- A seleção automática de mesa não foi implementada; o operador atribui manualmente.
+- O consumer roda como processo separado (`npm run consumer`) e processa eventos de forma assíncrona.
