@@ -12,6 +12,6 @@ Obervação: Revendo o vídeo, vi que utilizei do refresh na demonstração, mas
 <img width="589" height="276" alt="image" src="https://github.com/user-attachments/assets/31e098a9-9eb0-4a4b-9964-933f98663d7c" />
 <img width="572" height="552" alt="image" src="https://github.com/user-attachments/assets/10845587-afb6-47ce-8715-d8984c700d60" />
 
-** Sprint 4—  Demonstração Geral do App:** 
+**Sprint 4 — Demonstração Final +App Flutter (Prestador):**
 
 - https://youtu.be/1rmlek3UXvU
